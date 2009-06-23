@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Parsimony.Prim
-  ( Parser, PrimParser
+  ( Parser, PrimParser, Reply(..)
   , runParser, primParser
   , parseError, try, lookAhead, labels
   , foldMany, skipMany, match
@@ -34,22 +34,26 @@ data Parser t a       = P { unP :: State t -> R t a }
 -- In the rest of the module we use the fact that pattern matching
 -- happens left to right to ensure that if matching on the 'Bool'
 -- fails, then we will not look at the 'Either' field.
-data R t a            = R !Bool (Either ParseError (a, State t))
+data R s a            = R !Bool (Reply s a)
+
+data Reply s a        = Ok !a !(State s)
+                      | Error !ParseError
+
 
 -- | The parser state.
 data State t          = State { stateInput :: !t          -- ^ Token source
                               , statePos   :: !SourcePos  -- ^ Current position
                               }
 
-type PrimParser t a   = State t -> Either ParseError (a,State t)
+type PrimParser s a   = State s -> Reply s a
 
 -- | Define a primitive parser.
 -- Consumes input on success.
 {-# INLINE primParser #-}
 primParser           :: PrimParser t a -> Parser t a
 primParser prim       = P $ \s -> case prim s of
-                                    r@(Left _) -> R False r
-                                    r          -> R True r
+                                    r@(Error _) -> R False r
+                                    r           -> R True r
 
 
 {-# INLINE runParser #-}
@@ -62,14 +66,14 @@ runParser p s         = case unP p s of
 -- Does not consume input.
 {-# INLINE getState #-}
 getState             :: Parser t (State t)
-getState              = P $ \s -> R False $ Right (s,s)
+getState              = P $ \s -> R False (Ok s s)
 
 -- | Modify the current parser state.
 -- Returns the old state.
 -- Does not consume input.
 {-# INLINE updateState #-}
 updateState          :: (State s -> State s) -> Parser s ()
-updateState f         = P $ \s -> R False $ Right ((),f s)
+updateState f         = P $ \s -> R False $! Ok () (f s)
 
 -- | Change the input stream of a parser.
 -- This is useful for extending the input stream with extra information.
@@ -85,16 +89,18 @@ mapState extract inject p  = P $ \big ->
   case extract big of
     (small,extra) ->
       case unP p small of
+        -- XXX: strict
         R c r -> R c $ case r of
-                        Left err          -> Left err
-                        Right (a,small1)  -> Right (a,inject small1 extra)
-    
+                         Error err    -> Error err
+                         Ok a small1  -> Ok a (inject small1 extra)
+
+
 
 -- | Fail with the given parser error without consuming any input.
 -- The error is applied to the current source position.
 {-# INLINE parseError #-}
 parseError          :: (SourcePos -> ParseError) -> Parser t a
-parseError e         = P $ \s -> R False $ Left $ e $ statePos s
+parseError e         = P $ \s -> R False $ Error $ e $ statePos s
 
 
 
@@ -109,8 +115,8 @@ parseError e         = P $ \s -> R False $ Left $ e $ statePos s
 try                :: Parser t a -> Parser t a
 try p               = P $ \s ->
   case unP p s of
-    R True (Left err) -> R False $ Left $ setErrorPos (statePos s) err
-    other             -> other
+    R True (Error err)  -> R False $ Error $ setErrorPos (statePos s) err
+    other               -> other
 
 
 -- | Applies the given parser without consuming any input.
@@ -118,8 +124,8 @@ try p               = P $ \s ->
 lookAhead          :: Parser t a -> Parser t a
 lookAhead p         = P $ \s ->
   R False $ case unP p s of
-              R _ (Left err)    -> Left err
-              R _ (Right (a,_)) -> Right (a,s)
+              R _ (Error err) -> Error err
+              R _ (Ok a _)    -> Ok a s
 
 -- | The resulting parser behaves like the input parser,
 -- except that in case of failure we use the given expectation
@@ -136,8 +142,8 @@ labels p msgs0      = P $ \s ->
           foldr (\m e -> addErrorMessage (Expect m) e)
              (setErrorMessage (Expect msg) err) msgs
 
-        addErr (Left e) = Left $ setExpectErrors e msgs0
-        addErr r        = r
+        addErr (Error e)  = Error $ setExpectErrors e msgs0
+        addErr r          = r
 
 
 -- | Apply a parser repeatedly, combining the results with the
@@ -150,20 +156,20 @@ labels p msgs0      = P $ \s ->
 foldMany :: (b -> a -> b) -> b -> Parser t a -> Parser t b
 foldMany cons nil p = P $ \s ->
   case unP p s of
-    R False (Right _)       -> crash "Parsec.pFold"
-    R False (Left _)        -> R False $ Right (nil,s)
-    R True  (Right (x,s1))  -> R True  $ (walk $! cons nil x) s1
-    R True  (Left err)      -> R True  $ Left err
+    R False (Ok {})     -> crash "Parsec.pFold"
+    R False (Error _)   -> R False $ Ok nil s
+    R True  (Ok x s1)   -> R True  $ (walk $! cons nil x) s1
+    R True  (Error err) -> R True  $ Error err
 
   -- NOTE: this is written like this because after the first iteration
   -- we already know weather the parser will be consuming input.
   where
   walk xs s =
     case unP p s of
-      R False (Right _)       -> crash "Parsec.pFold"
-      R False (Left _)        -> Right (xs,s)
-      R True  (Right (x,s1))  -> (walk $! cons xs x) s1
-      R True  (Left e)        -> Left e
+      R False (Ok {})   -> crash "Parsec.pFold"
+      R False (Error _) -> Ok xs s
+      R True  (Ok x s1) -> (walk $! cons xs x) s1
+      R True  (Error e) -> Error e
 
 
 -- | Apply a parser repeatedly, ignoring the results.
@@ -177,20 +183,20 @@ skipMany p = P $ \s ->
   -- pFold specialized for a common case
 
   case unP p s of
-    R False (Right _)       -> crash "Parsec.skipMany"
-    R False (Left _)        -> R False $ Right ((),s)
-    R True  (Right (_,s1))  -> R True  $ walk s1
-    R True  (Left err)      -> R True  $ Left err
+    R False (Ok {})     -> crash "Parsec.skipMany"
+    R False (Error _)   -> R False $ Ok () s
+    R True  (Ok _ s1)   -> R True  $ walk s1
+    R True  (Error err) -> R True  $ Error err
 
   -- NOTE: this is written like this because after the first iteration
   -- we already know weather the parser will be consuming input.
   where
   walk s =
     case unP p s of
-      R False (Right _)       -> crash "Parsec.skipMany"
-      R False (Left _)        -> Right ((),s)
-      R True  (Right (_,s1))  -> walk s1
-      R True  (Left e)        -> Left e
+      R False (Ok {})   -> crash "Parsec.skipMany"
+      R False (Error _) -> Ok () s
+      R True  (Ok _ s1) -> walk s1
+      R True  (Error e) -> Error e
 
 
 -- | Produces a parser that succeeds if it can extract the list of values
@@ -205,28 +211,28 @@ match sh goal p = P (outer goal)
   unexpected x pos    = newErrorMessage (UnExpect (sh x)) pos
 
   -- not yet consumed
-  outer [] s      = R False $ Right ((),s)
+  outer [] s      = R False $ Ok () s
   outer (x:xs) s  =
      case unP (labels p [sh x]) s of
-       R False (Right (a,s1))
+       R False (Ok a s1)
          | x == a    -> outer xs s1
-         | otherwise -> R False $ Left $ expected x $ unexpected a $ statePos s
-       R False (Left e) -> R False $ Left e
+         | otherwise -> R False $ Error $ expected x $ unexpected a $ statePos s
+       R False (Error e) -> R False $ Error e
        R True r -> R True $
          case r of
-           Left e -> Left $ expected x e
-           Right (a,s1)
+           Error e -> Error $ expected x e
+           Ok a s1
              | x == a    -> inner xs s1
-             | otherwise -> Left $ expected x $ unexpected a $ statePos s
+             | otherwise -> Error $ expected x $ unexpected a $ statePos s
 
   -- we consumed something
-  inner [] s      = Right ((),s)
+  inner [] s      = Ok () s
   inner (x:xs) s  =
     case unP (labels p [sh x]) s of
-      R _ (Right (a,s1))
+      R _ (Ok a s1)
         | x == a    -> inner xs s1
-        | otherwise -> Left $ expected x $ unexpected a $ statePos s
-      R _ (Left e)  -> Left e
+        | otherwise -> Error $ expected x $ unexpected a $ statePos s
+      R _ (Error e) -> Error e
 
 
 
@@ -244,18 +250,18 @@ instance Monad (Parser t) where
   p >>= f   = P $ \s ->
     case unP p s of
       R True r  -> R True $ case r of
-                              Left e -> Left e
-                              Right (a,s1) ->
+                              Error e -> Error e
+                              Ok a s1 ->
                                 case unP (f a) s1 of
                                   R _ r1 -> r1
       R False r -> case r of
-                     Left e -> R False $ Left e
-                     Right (a,s1) -> unP (f a) s1
+                     Error e  -> R False $ Error e
+                     Ok a s1  -> unP (f a) s1
 
   fail m  = parseError (newErrorMessage (Message m))
 
 instance Applicative (Parser t) where
-  pure a  = P $ \s -> R False $ Right (a,s)
+  pure a  = P $ \s -> R False $ Ok a s
   (<*>)   = ap
 
 instance Alternative (Parser t) where
@@ -265,8 +271,8 @@ instance Alternative (Parser t) where
     -- because then we can quickly move to the second branch, without
     -- having to perform any actual parsing.
     case unP p1 s of
-      R False (Left _) -> unP p2 s
-      other            -> other
+      R False (Error _) -> unP p2 s
+      other             -> other
 
 
 instance MonadPlus (Parser t) where

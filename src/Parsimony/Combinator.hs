@@ -147,8 +147,8 @@ parseSource        :: Parser t a    -- ^ The parser to apply
                    -> Either ParseError a
 
 parseSource p s i   = case runParser p $ State i $ initialPos s of
-                        Left err    -> Left err
-                        Right (a,_) -> Right a
+                        Error err   -> Left err
+                        Ok a _      -> Right a
 
 -- | Apply a parser to the given input.
 parse              :: Parser t a           -- ^ The parser to apply
@@ -162,4 +162,4 @@ parse p             = parseSource p ""
 
 
 
-                        
+

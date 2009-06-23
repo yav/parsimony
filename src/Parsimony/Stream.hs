@@ -60,19 +60,17 @@ instance Token Word8 where
 class Token token => Stream stream token | stream -> token where
   getToken :: PrimParser stream token
 
-eof_err :: SourcePos -> Either ParseError a
-eof_err p = Left $ newErrorMessage (UnExpect "end of input") p
+eof_err :: SourcePos -> Reply s a
+eof_err p = Error $ newErrorMessage (UnExpect "end of input") p
 
 {-# INLINE genToken #-}
 genToken :: Token t => (i -> Maybe (t,i)) -> PrimParser i t
 genToken unc (State i p) =
     case unc i of
       Nothing     -> eof_err p
-      Just (t,ts) -> Right ( t
-                           , State { stateInput = ts
-                                   , statePos   = updatePos t p
-                                   }       
-                           )
+      Just (t,ts) -> Ok t State { stateInput = ts
+                                , statePos   = updatePos t p
+                                }
 
 instance Token a => Stream [a] a where
   getToken = genToken (\xs -> case xs of
@@ -102,8 +100,8 @@ utf8 = fromRep
 instance Stream a Word8 => Stream (ASCII a) Char where
   getToken (State (ASCII buf) p) =
     case getToken (State buf p) of
-      Left err              -> Left err
-      Right (w,State b1 p1) -> Right (toEnum (fromEnum w), State (ASCII b1) p1)
+      Error err           -> Error err
+      Ok w (State b1 p1)  -> Ok (toEnum (fromEnum w)) (State (ASCII b1) p1)
 
 
 instance Stream (UTF8 [Word8]) Char where
@@ -121,8 +119,8 @@ genTokenChar :: UTF8Bytes stream ix => PrimParser (UTF8 stream) Char
 genTokenChar (State i p) =
     case UTF8.uncons i of
       Just (a,i1)
-        | a /= replacement_char -> Right (a,State i1 (updatePos a p))
-        | otherwise -> Left $ newErrorMessage
+        | a /= replacement_char -> Ok a (State i1 (updatePos a p))
+        | otherwise -> Error $ newErrorMessage
                               (Message "invalid UTF8 character") p
       Nothing -> eof_err p
 

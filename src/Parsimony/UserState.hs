@@ -54,8 +54,8 @@ instance Stream stream token => Stream (UserState user stream) token where
     case extract s of
       (s1,u) ->
         case getToken s1 of
-          Left err      -> Left err
-          Right (a,s2)  -> Right (a, inject s2 u)
+          Error err -> Error err
+          Ok a s2   -> Ok a (inject s2 u)
 
 -- | Turn a parser without user space into ine that supports
 -- user state manipulation.
