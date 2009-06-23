@@ -1,13 +1,4 @@
---------------------------------------------------------------------
--- |
--- Module    : Text.JSON.Parsec
--- Copyright : (c) Galois, Inc. 2007-2009
---
--- Maintainer:  Sigbjorn Finne <sof@galois.com>
--- Stability :  provisional
--- Portability: portable
---
--- Parse JSON values using the Parsec combinators.
+module ParsecJSON (run) where
 
 import Text.JSON.Types
 import Text.ParserCombinators.Parsec
@@ -15,10 +6,10 @@ import Control.Monad
 import Data.Char
 import Numeric
 
-
-main             :: IO ()
-main              = interact (show . parse p_value "")
-
+run :: String -> JSValue
+run txt = case parse p_value "" txt of
+            Left err -> error (show err)
+            Right a  -> a
 
 p_value :: CharParser () JSValue
 p_value = spaces *> p_jvalue
