@@ -156,7 +156,7 @@ labels p msgs0      = P $ \s ->
 foldMany :: (b -> a -> b) -> b -> Parser t a -> Parser t b
 foldMany cons nil p = P $ \s ->
   case unP p s of
-    R False (Ok {})     -> crash "Parsec.pFold"
+    R False (Ok {})     -> crash "Parsimony.foldMany"
     R False (Error _)   -> R False $ Ok nil s
     R True  (Ok x s1)   -> R True  $ (walk $! cons nil x) s1
     R True  (Error err) -> R True  $ Error err
@@ -166,7 +166,7 @@ foldMany cons nil p = P $ \s ->
   where
   walk xs s =
     case unP p s of
-      R False (Ok {})   -> crash "Parsec.pFold"
+      R False (Ok {})   -> crash "Parsimony.foldMany"
       R False (Error _) -> Ok xs s
       R True  (Ok x s1) -> (walk $! cons xs x) s1
       R True  (Error e) -> Error e
@@ -183,7 +183,7 @@ skipMany p = P $ \s ->
   -- pFold specialized for a common case
 
   case unP p s of
-    R False (Ok {})     -> crash "Parsec.skipMany"
+    R False (Ok {})     -> crash "Parsimony.skipMany"
     R False (Error _)   -> R False $ Ok () s
     R True  (Ok _ s1)   -> R True  $ walk s1
     R True  (Error err) -> R True  $ Error err
@@ -193,7 +193,7 @@ skipMany p = P $ \s ->
   where
   walk s =
     case unP p s of
-      R False (Ok {})   -> crash "Parsec.skipMany"
+      R False (Ok {})   -> crash "Parsimony.skipMany"
       R False (Error _) -> Ok () s
       R True  (Ok _ s1) -> walk s1
       R True  (Error e) -> Error e
@@ -238,7 +238,7 @@ match sh goal p = P (outer goal)
 
 -- | We use to let the user know that we have entered an infinity loop.
 crash :: String -> a
-crash f = error $ f ++ " applied to a parser  that accepts the empty string."
+crash f = error $ f ++ " applied to a parser that accepts the empty string."
 
 -- Instances -------------------------------------------------------------------
 
