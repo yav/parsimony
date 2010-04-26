@@ -16,7 +16,7 @@ module Parsimony.Prim
   ( Parser, PrimParser, Reply(..)
   , runParser, primParser
   , parseError, try, lookAhead, labels
-  , foldMany, skipMany, match
+  , foldMany, foldManyWhile, skipMany, match
   , State(..), getState, updateState, mapState
   ) where
 
@@ -170,6 +170,38 @@ foldMany cons nil p = P $ \s ->
       R False (Error _) -> Ok xs s
       R True  (Ok x s1) -> (walk $! cons xs x) s1
       R True  (Error e) -> Error e
+
+
+-- | Apply a parser repeatedly, combining the results with the
+-- given functions.  This function is similar to the strict 'foldl'.
+-- We stop on one of the following conditions:
+--   * an application of the parser fails without consuming any input,
+--   * the pearser returns 'Nothing' as a result.
+-- If the parser fails after it has consumed some input, then
+-- the repeated parser will also fail.
+
+{-# INLINE foldManyWhile #-}
+foldManyWhile :: (b -> a -> b) -> b -> Parser t (Maybe a) -> Parser t b
+foldManyWhile cons nil p = P $ \s ->
+  case unP p s of
+    R False (Ok Nothing _)   -> R False $ Ok nil s
+    R False (Ok {})          -> crash "Parsimony.foldManyWhile"
+    R False (Error _)        -> R False $ Ok nil s
+    R True  (Ok Nothing s1)  -> R True  $ Ok nil s1
+    R True  (Ok (Just x) s1) -> R True  $ (walk $! cons nil x) s1
+    R True  (Error err)      -> R True  $ Error err
+
+  -- NOTE: this is written like this because after the first iteration
+  -- we already know weather the parser will be consuming input.
+  where
+  walk xs s =
+    case unP p s of
+      R False (Ok Nothing _)    -> Ok xs s
+      R False (Ok {})           -> crash "Parsimony.foldManyWhile"
+      R False (Error _)         -> Ok xs s
+      R True  (Ok Nothing s1)   -> Ok xs s1
+      R True  (Ok (Just x) s1)  -> (walk $! cons xs x) s1
+      R True  (Error e)         -> Error e
 
 
 -- | Apply a parser repeatedly, ignoring the results.
