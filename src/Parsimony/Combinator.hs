@@ -65,7 +65,10 @@ sepEndBy           :: Parser t a -> Parser t sep -> Parser t [a]
 sepEndBy p sep      = option [] (sepEndBy1 p sep)
 
 sepEndBy1          :: Parser t a -> Parser t sep -> Parser t [a]
-sepEndBy1 p sep     = sepBy1 p sep <* optional sep
+sepEndBy1 p sep     = do x <- p
+                         reverse <$> foldManyWhile (flip (:)) [x] loopP
+  where
+  loopP = option Nothing (sep >> option Nothing (Just <$> p))
 
 -- directly recursive
 count              :: Int -> Parser t  a -> Parser t  [a]
