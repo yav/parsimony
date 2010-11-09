@@ -52,7 +52,7 @@ module Parsimony
 
 
     -- * Primitive Parsers
-  , PrimParser
+  , PrimParser, Reply(..)
   , primParser
   ) where
 
