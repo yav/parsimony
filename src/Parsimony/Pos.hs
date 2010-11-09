@@ -71,7 +71,7 @@ updatePosChar   :: SourcePos -> Char -> SourcePos
 updatePosChar p c
     = forcePos $
       case c of
-        '\n' -> incSourceLine p 1
+        '\n' -> setSourceColumn (incSourceLine p 1) 1
         '\t' -> incSourceColumn p (8 - ((sourceColumn p - 1) `mod` 8))
         _    -> incSourceColumn p 1
 
