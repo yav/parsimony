@@ -22,7 +22,7 @@ module Parsimony
   , (<|>), try, choice
 
     -- * Repetition
-  , many, many1, skipMany1, match
+  , many, many1, skipMany, skipMany1, match
   , sepBy, sepBy1
   , endBy, endBy1
   , sepEndBy, sepEndBy1
