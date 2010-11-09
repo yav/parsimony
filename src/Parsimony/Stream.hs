@@ -17,7 +17,7 @@
 
 
 
-module Parsimony.Stream 
+module Parsimony.Stream
   ( Token(..), Stream(..)
   , ASCII, UTF8, ascii, utf8
   ) where
