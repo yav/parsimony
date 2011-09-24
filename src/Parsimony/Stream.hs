@@ -17,10 +17,7 @@
 
 
 
-module Parsimony.Stream
-  ( Token(..), Stream(..)
-  , ASCII, UTF8, ascii, utf8
-  ) where
+module Parsimony.Stream (Token(..), Stream(..)) where
 
 import Parsimony.Prim
 import Parsimony.Pos
@@ -28,8 +25,8 @@ import Parsimony.Error
 
 import qualified Data.ByteString as Strict (ByteString,uncons)
 import qualified Data.ByteString.Lazy as Lazy (ByteString,uncons)
-import Data.String.UTF8 (UTF8,UTF8Bytes,fromRep,replacement_char)
-import qualified Data.String.UTF8 as UTF8 (uncons)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
 import Data.Word (Word8)
 import Numeric (showHex)
 
@@ -83,45 +80,9 @@ instance Stream Strict.ByteString Word8 where
 instance Stream Lazy.ByteString Word8 where
   getToken = genToken Lazy.uncons
 
--- Character encodings ---------------------------------------------------------
+instance Stream T.Text Char where
+  getToken = genToken T.uncons
 
-
--- | The type of ASCII encoded content.
-newtype ASCII content = ASCII content
-
--- | Specify ASCII encoding for some content.
-ascii :: content -> ASCII content
-ascii = ASCII
-
--- | Specify UTF8 encoding for some content.
-utf8 :: content -> UTF8 content
-utf8 = fromRep
-
-instance Stream a Word8 => Stream (ASCII a) Char where
-  getToken (State (ASCII buf) p) =
-    case getToken (State buf p) of
-      Error err           -> Error err
-      Ok w (State b1 p1)  -> Ok (toEnum (fromEnum w)) (State (ASCII b1) p1)
-
-
-instance Stream (UTF8 [Word8]) Char where
-  getToken = genTokenChar
-
-instance Stream (UTF8 Strict.ByteString) Char where
-  getToken = genTokenChar
-
-instance Stream (UTF8 Lazy.ByteString) Char where
-  getToken = genTokenChar
-
-
-{-# INLINE genTokenChar #-}
-genTokenChar :: UTF8Bytes stream ix => PrimParser (UTF8 stream) Char
-genTokenChar (State i p) =
-    case UTF8.uncons i of
-      Just (a,i1)
-        | a /= replacement_char -> Ok a (State i1 (updatePos a p))
-        | otherwise -> Error $ newErrorMessage
-                              (Message "invalid UTF8 character") p
-      Nothing -> eof_err p
-
+instance Stream LT.Text Char where
+  getToken = genToken LT.uncons
 

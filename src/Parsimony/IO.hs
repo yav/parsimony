@@ -12,102 +12,79 @@
 -----------------------------------------------------------------------------
 
 module Parsimony.IO
-  ( parseFileASCII
-  , parseFileUTF8
-  , parseLargeFileASCII
-  , parseLargeFileUTF8
+  ( parseFile
+  , parseLargeFile
+  , parseBinaryFile
+  , parseLargeBinaryFile
 
-  , uparseFileASCII
-  , uparseFileUTF8
-  , uparseLargeFileASCII
-  , uparseLargeFileUTF8
+  , uparseFile
+  , uparseLargeFile
+  , uparseBinaryFile
+  , uparseLargeBinaryFile
   ) where
 
 import Parsimony.Prim
 import Parsimony.Error
-import Parsimony.Stream
 import Parsimony.Combinator
 import Parsimony.UserState
 
 import qualified Data.ByteString as Strict
 import qualified Data.ByteString.Lazy as Lazy
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.IO as LT
 
--- | Parse a file containing ASCII encoded characters.
+-- | Parse a text file in one go.
 -- This functions loads the whole file in memory.
-parseFileASCII :: FilePath
-               -> Parser (ASCII Strict.ByteString) a
-               -> IO (Either ParseError a)
-parseFileASCII f p =
-  do bytes <- Strict.readFile f
-     return $ parseSource p f $ ascii bytes
+parseFile :: FilePath -> Parser T.Text a -> IO (Either ParseError a)
+parseFile f p = parseSource p f `fmap` T.readFile f
 
--- | Parse a file containing UTF8 encoded characters.
+-- | Parse a text file in chunks.
+-- This functions loads the file in chunks.
+parseLargeFile :: FilePath -> Parser LT.Text a -> IO (Either ParseError a)
+parseLargeFile f p = parseSource p f `fmap` LT.readFile f
+
+-- | Parse a binary file in one go.
 -- This functions loads the whole file in memory.
-parseFileUTF8 :: FilePath
-              -> Parser (UTF8 Strict.ByteString) a
-              -> IO (Either ParseError a)
-parseFileUTF8 f p =
-  do bytes <- Strict.readFile f
-     return $ parseSource p f $ utf8 bytes
-      
--- | Parse a file containing ASCII encoded characters.
--- This functions loads the file in chunks.
-parseLargeFileASCII :: FilePath
-                    -> Parser (ASCII Lazy.ByteString) a
-                    -> IO (Either ParseError a)
-parseLargeFileASCII f p =
-  do bytes <- Lazy.readFile f
-     return $ parseSource p f $ ascii bytes
+parseBinaryFile :: FilePath -> Parser Strict.ByteString a ->
+                                                IO (Either ParseError a)
+parseBinaryFile f p = parseSource p f `fmap` Strict.readFile f
 
--- | Parse a file containing UTF8 encoded characters.
+-- | Parse a text file in chunks.
 -- This functions loads the file in chunks.
-parseLargeFileUTF8 :: FilePath
-                   -> Parser (UTF8 Lazy.ByteString) a
-                   -> IO (Either ParseError a)
-parseLargeFileUTF8 f p =
-  do bytes <- Lazy.readFile f
-     return $ parseSource p f $ utf8 bytes
+parseLargeBinaryFile :: FilePath -> Parser Lazy.ByteString a ->
+                                                    IO (Either ParseError a)
+parseLargeBinaryFile f p = parseSource p f `fmap` Lazy.readFile f
+
 
 -- With user state -------------------------------------------------------------
 
--- | Parse a file containing ASCII encoded characters,
--- using a parser with custom user state.
--- This functions loads the whole file in memory.
-uparseFileASCII :: FilePath
-               -> ParserU u (ASCII Strict.ByteString) a
-               -> u -> IO (Either ParseError a)
-uparseFileASCII f p u =
-  do bytes <- Strict.readFile f
-     return $ uparseSource p u f $ ascii bytes
 
--- | Parse a file containing UTF8 encoded characters,
--- using a parser with custom user state.
--- This functions loads the whole file in memory.
-uparseFileUTF8 :: FilePath
-              -> ParserU u (UTF8 Strict.ByteString) a
-              -> u -> IO (Either ParseError a)
-uparseFileUTF8 f p u =
-  do bytes <- Strict.readFile f
-     return $ uparseSource p u f $ utf8 bytes
-      
--- | Parse a file containing ASCII encoded characters,
--- using a parser with custom user state.
--- This functions loads the file in chunks.
-uparseLargeFileASCII :: FilePath
-                    -> ParserU u (ASCII Lazy.ByteString) a
-                    -> u -> IO (Either ParseError a)
-uparseLargeFileASCII f p u =
-  do bytes <- Lazy.readFile f
-     return $ uparseSource p u f $ ascii bytes
 
--- | Parse a file containing UTF8 encoded characters,
--- using a parser with custom user state.
+-- | Parse a text file in one go, using user state.
+-- This functions loads the whole file in memory.
+uparseFile :: FilePath -> ParserU u T.Text a -> u -> IO (Either ParseError a)
+uparseFile f p u = uparseSource p u f `fmap` T.readFile f
+
+-- | Parse a text file in chunks, using user state.
 -- This functions loads the file in chunks.
-uparseLargeFileUTF8 :: FilePath
-                   -> ParserU u (UTF8 Lazy.ByteString) a
-                   -> u -> IO (Either ParseError a)
-uparseLargeFileUTF8 f p u =
-  do bytes <- Lazy.readFile f
-     return $ uparseSource p u f $ utf8 bytes
- 
- 
+uparseLargeFile :: FilePath -> ParserU u LT.Text a ->
+                                            u -> IO (Either ParseError a)
+uparseLargeFile f p u = uparseSource p u f `fmap` LT.readFile f
+
+-- | Parse a binary file in one go, using user state.
+-- This functions loads the whole file in memory.
+uparseBinaryFile :: FilePath -> ParserU u Strict.ByteString a ->
+                                             u -> IO (Either ParseError a)
+uparseBinaryFile f p u = uparseSource p u f `fmap` Strict.readFile f
+
+-- | Parse a text file in chunks, using user state.
+-- This functions loads the file in chunks.
+uparseLargeBinaryFile :: FilePath -> ParserU u Lazy.ByteString a ->
+                                             u -> IO (Either ParseError a)
+uparseLargeBinaryFile f p u = uparseSource p u f `fmap` Lazy.readFile f
+
+
+
+
