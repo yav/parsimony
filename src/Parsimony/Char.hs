@@ -39,8 +39,10 @@ noneOf cs           = satisfy (\c -> not (elem c cs))
 spaces             :: Stream s Char => Parser s ()
 spaces              = skipMany space        <?> "white space"
 
-space, newline, tab :: Stream s Char => Parser s Char
+space              :: Stream s Char => Parser s Char
 space               = satisfy (isSpace)     <?> "space"
+
+newline, tab       :: Stream s Char => Parser s ()
 newline             = char '\n'             <?> "new-line"
 tab                 = char '\t'             <?> "tab"
 
@@ -54,8 +56,8 @@ digit               = satisfy (isDigit)     <?> "digit"
 hexDigit            = satisfy (isHexDigit)  <?> "hexadecimal digit"
 octDigit            = satisfy (isOctDigit)  <?> "octal digit"
 
-char               :: Stream s Char => Char -> Parser s Char
-char c              = satisfy (==c)  <?> show [c]
+char               :: Stream s Char => Char -> Parser s ()
+char c              = (satisfy (==c) >> return ())  <?> show [c]
 
 anyChar            :: Stream s Char => Parser s Char
 anyChar             = anyToken <?> "a character"
@@ -65,9 +67,9 @@ satisfy f           = try $ anyChar >>= \c ->
                               if f c then return c
                                      else unexpected (show c)
 
-string             :: Stream s Char => String -> Parser s String
-string []           = return []
-string s@(c:cs)     = try (char c) >> match show cs anyChar >> return s
+string             :: Stream s Char => String -> Parser s ()
+string []           = return ()
+string (c:cs)       = try (char c) >> match show cs anyChar
 
 
 
