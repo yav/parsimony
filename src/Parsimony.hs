@@ -42,12 +42,13 @@ module Parsimony
   , lookAhead, anyToken
 
     -- * Errors 
-  , (<?>), unexpected, empty, parseError, labels 
+  , ParseError, errorPos, (<?>), unexpected, empty, parseError, labels 
 
     -- * Parser State
   , State(..)
   , setState, updateState, mapState
   , getInput, setInput, updateInput
+  , SourcePos(..), SourceName, Line, Column
   , getPosition, setPosition, updatePosition
 
 
@@ -59,4 +60,6 @@ module Parsimony
 import Control.Applicative hiding(many)
 import Parsimony.Prim
 import Parsimony.Combinator
+import Parsimony.Error(ParseError, errorPos)
+import Parsimony.Pos(SourcePos(..), SourceName, Line, Column)
 
