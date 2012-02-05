@@ -134,7 +134,8 @@ lookAhead p         = P $ \s ->
 labels             :: Parser t a -> [String] -> Parser t a
 labels p msgs0      = P $ \s ->
   case unP p s of
-    R c r -> R c (addErr r)
+    R False r -> R False (addErr r)
+    other     -> other
 
   where setExpectErrors err []         = setErrorMessage (Expect "") err
         setExpectErrors err [msg]      = setErrorMessage (Expect msg) err
@@ -272,7 +273,7 @@ match sh goal p = P (outer goal)
 crash :: String -> a
 crash f = error $ f ++ " applied to a parser that accepts the empty string."
 
--- Instances -------------------------------------------------------------------
+-- Instances -----------------------------------------------------------------
 
 instance Functor (Parser t) where
   fmap = liftM
@@ -303,9 +304,12 @@ instance Alternative (Parser t) where
     -- because then we can quickly move to the second branch, without
     -- having to perform any actual parsing.
     case unP p1 s of
-      R False (Error _) -> unP p2 s
+      R False (Error e) ->
+        case unP p2 s of
+          R c r -> R c $ case r of
+                           Error e2 -> Error (mergeError e e2)
+                           _        -> r
       other             -> other
-
 
 instance MonadPlus (Parser t) where
   mzero   = empty

@@ -63,9 +63,10 @@ anyChar            :: Stream s Char => Parser s Char
 anyChar             = anyToken <?> "a character"
 
 satisfy            :: Stream s Char => (Char -> Bool) -> Parser s Char
-satisfy f           = try $ anyChar >>= \c ->
+satisfy f           = (try $ anyChar >>= \c ->
                               if f c then return c
-                                     else unexpected (show c)
+                                     else unexpected (show c))
+                        <?> ""
 
 string             :: Stream s Char => String -> Parser s ()
 string []           = return ()
