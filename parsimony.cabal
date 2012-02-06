@@ -19,7 +19,7 @@ description:
     It also supports working with text in different character
     encodings such as UTF8.
 
-cabal-version: >= 1.2
+cabal-version: >= 1.6
 build-type:     Simple
 
 library
@@ -41,5 +41,10 @@ library
     bytestring,
     text
   GHC-options: -O2 -Wall
+
+source-repository head
+  type:          git
+  location:      git://github.com/yav/parsimony.git
+
 
 
