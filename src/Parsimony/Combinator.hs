@@ -89,7 +89,10 @@ eof                 = notFollowedBy' showToken anyToken <?> "end of input"
 -- | Succeeds if the given parser fails.  The function is used
 -- to display the result in error messages.
 notFollowedBy'     :: (a -> String) -> Parser t a -> Parser t ()
-notFollowedBy' sh p = skip (try p >>= unexpected . sh)
+notFollowedBy' sh p = skip $ do s <- getState
+                                a <- p
+                                setState s
+                                unexpected (sh a)
 
 -- | Succeeds if the given parser fails.
 -- Uses the 'Show' instance of the result type in error messages.
